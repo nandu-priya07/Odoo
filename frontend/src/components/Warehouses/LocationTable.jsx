@@ -1,7 +1,7 @@
 import React from "react";
 
-const WarehouseTable = ({
-  warehouses,
+const LocationTable = ({
+  locations,
   loading,
   pagination,
   onPageChange,
@@ -38,13 +38,13 @@ const WarehouseTable = ({
           }}
         />
         <p style={{ margin: 0, fontSize: "14px", fontWeight: 500 }}>
-          Loading warehouses...
+          Loading locations...
         </p>
       </div>
     );
   }
 
-  if (!warehouses || warehouses.length === 0) {
+  if (!locations || locations.length === 0) {
     return (
       <div
         className="card"
@@ -58,12 +58,12 @@ const WarehouseTable = ({
         }}
       >
         <p style={{ fontSize: "16px", fontWeight: 600, color: "#334155", margin: "0 0 8px 0" }}>
-          No warehouses found.
+          No locations found.
         </p>
         <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 16px 0" }}>
           {isFiltered
-            ? "No warehouses match the selected filters."
-            : "Get started by creating your first storage facility or warehouse hub."}
+            ? "No locations match the selected filters."
+            : "Define storage bins, racks, or aisles inside your warehouses."}
         </p>
         {onCreateNew && (
           <button
@@ -72,7 +72,7 @@ const WarehouseTable = ({
             style={{ padding: "8px 18px", fontSize: "13px" }}
             onClick={onCreateNew}
           >
-            + New Warehouse
+            + Add Location
           </button>
         )}
       </div>
@@ -94,16 +94,16 @@ const WarehouseTable = ({
           <thead>
             <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
               <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
-                Warehouse Name
+                Location Name
               </th>
               <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
-                Address
+                Warehouse
               </th>
               <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
-                Locations
+                Products
               </th>
               <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
-                Total Stock Units
+                Total Units
               </th>
               <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
                 Status
@@ -117,10 +117,10 @@ const WarehouseTable = ({
             </tr>
           </thead>
           <tbody>
-            {warehouses.map((wh) => (
+            {locations.map((loc) => (
               <tr
-                key={wh.id}
-                onClick={() => onView(wh)}
+                key={loc.id}
+                onClick={() => onView(loc)}
                 style={{
                   cursor: "pointer",
                   borderBottom: "1px solid #f1f5f9",
@@ -130,14 +130,16 @@ const WarehouseTable = ({
               >
                 <td style={{ padding: "12px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "18px" }}>🏢</span>
+                    <span style={{ fontSize: "18px" }}>📍</span>
                     <strong style={{ color: "#0f172a", fontSize: "14px" }}>
-                      {wh.name}
+                      {loc.name}
                     </strong>
                   </div>
                 </td>
-                <td style={{ padding: "12px 16px", color: "#64748b", fontSize: "13px" }}>
-                  {wh.address || <span style={{ color: "#94a3b8" }}>No address provided</span>}
+                <td style={{ padding: "12px 16px" }}>
+                  <span style={{ color: "#334155", fontSize: "13px", fontWeight: 500 }}>
+                    {loc.warehouse?.name || loc.warehouseName || "N/A"}
+                  </span>
                 </td>
                 <td style={{ padding: "12px 16px", textAlign: "center" }}>
                   <span
@@ -150,28 +152,28 @@ const WarehouseTable = ({
                       fontWeight: 600,
                     }}
                   >
-                    {wh.locationCount} {wh.locationCount === 1 ? "location" : "locations"}
+                    {loc.productCount} {loc.productCount === 1 ? "product" : "products"}
                   </span>
                 </td>
                 <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: "#0f172a" }}>
-                  {wh.totalUnits.toLocaleString()} units
+                  {loc.totalUnits.toLocaleString()} units
                 </td>
                 <td style={{ padding: "12px 16px", textAlign: "center" }}>
                   <span
                     className={`badge ${
-                      wh.status === "ACTIVE" ? "badge-success" : "badge-secondary"
+                      loc.status === "ACTIVE" ? "badge-success" : "badge-secondary"
                     }`}
                     style={
-                      wh.status === "ACTIVE"
+                      loc.status === "ACTIVE"
                         ? { background: "#dcfce7", color: "#166534" }
                         : { background: "#f1f5f9", color: "#64748b" }
                     }
                   >
-                    {wh.status || "ACTIVE"}
+                    {loc.status || "ACTIVE"}
                   </span>
                 </td>
                 <td style={{ padding: "12px 16px", color: "#64748b", fontSize: "13px", whiteSpace: "nowrap" }}>
-                  {new Date(wh.createdAt).toLocaleDateString(undefined, {
+                  {new Date(loc.createdAt).toLocaleDateString(undefined, {
                     day: "2-digit",
                     month: "short",
                     year: "numeric",
@@ -183,8 +185,8 @@ const WarehouseTable = ({
                       type="button"
                       className="btn btn-outline"
                       style={{ padding: "4px 10px", fontSize: "12px" }}
-                      onClick={() => onView(wh)}
-                      title="View warehouse locations and stock"
+                      onClick={() => onView(loc)}
+                      title="View location inventory"
                     >
                       View
                     </button>
@@ -192,12 +194,12 @@ const WarehouseTable = ({
                       type="button"
                       className="btn btn-outline"
                       style={{ padding: "4px 10px", fontSize: "12px" }}
-                      onClick={() => onEdit(wh)}
-                      title="Edit warehouse details"
+                      onClick={() => onEdit(loc)}
+                      title="Edit location details"
                     >
                       Edit
                     </button>
-                    {wh.status === "ACTIVE" && (
+                    {loc.status === "ACTIVE" && (
                       <button
                         type="button"
                         className="btn btn-outline"
@@ -207,8 +209,8 @@ const WarehouseTable = ({
                           color: "#dc2626",
                           borderColor: "#fecaca",
                         }}
-                        onClick={() => onDeactivate(wh)}
-                        title="Deactivate warehouse"
+                        onClick={() => onDeactivate(loc)}
+                        title="Deactivate location"
                       >
                         Deactivate
                       </button>
@@ -240,7 +242,7 @@ const WarehouseTable = ({
             <strong>
               {Math.min(pagination.page * pagination.limit, pagination.total)}
             </strong>{" "}
-            of <strong>{pagination.total}</strong> warehouses
+            of <strong>{pagination.total}</strong> locations
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -298,4 +300,4 @@ const WarehouseTable = ({
   );
 };
 
-export default WarehouseTable;
+export default LocationTable;

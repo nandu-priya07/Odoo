@@ -1,16 +1,30 @@
 import express from "express";
-import { getWarehouses, getWarehouseById } from "../pages/warehouses/warehouse.js";
-import { createWarehouse, updateWarehouse } from "../pages/warehouses/createWarehouse.js";
-import { getLocations, createLocation, getStockByLocation } from "../pages/warehouses/location.js";
+import {
+  getWarehouses,
+  getWarehouseById,
+  createWarehouse,
+  updateWarehouse,
+  deactivateWarehouse,
+} from "../pages/warehouses/warehouse.js";
+import {
+  getLocations,
+  getLocationById,
+  getWarehouseLocations,
+} from "../pages/locations/location.js";
 
 const router = express.Router();
 
-router.get("/", getWarehouses);
+// Specific routes before param :id
 router.get("/locations", getLocations);
-router.get("/locations/:locationId/stock", getStockByLocation);
+router.get("/locations/:id/stock", getLocationById);
+router.get("/:warehouseId/locations", getWarehouseLocations);
+
+// Core Warehouse Routes
+router.get("/", getWarehouses);
 router.get("/:id", getWarehouseById);
 router.post("/", createWarehouse);
-router.put("/:id", updateWarehouse);
-router.post("/locations", createLocation);
+router.patch("/:id", updateWarehouse);
+router.put("/:id", updateWarehouse); // Alias for compatibility
+router.post("/:id/deactivate", deactivateWarehouse);
 
 export default router;

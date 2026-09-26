@@ -49,15 +49,21 @@ export const createTransfer = async (req, res) => {
       });
     }
 
-    // 3. Verify locations exist
-    const fromLocRes = await pool.query("SELECT id, name FROM locations WHERE id = $1", [fromLocationId]);
+    // 3. Verify locations exist and are active
+    const fromLocRes = await pool.query("SELECT id, name, status FROM locations WHERE id = $1", [fromLocationId]);
     if (fromLocRes.rows.length === 0) {
       return res.status(400).json({ success: false, message: "Source location does not exist." });
     }
+    if (fromLocRes.rows[0].status === "INACTIVE") {
+      return res.status(400).json({ success: false, message: `Source location (${fromLocRes.rows[0].name}) is inactive and cannot be used for transfers.` });
+    }
 
-    const toLocRes = await pool.query("SELECT id, name FROM locations WHERE id = $1", [toLocationId]);
+    const toLocRes = await pool.query("SELECT id, name, status FROM locations WHERE id = $1", [toLocationId]);
     if (toLocRes.rows.length === 0) {
       return res.status(400).json({ success: false, message: "Destination location does not exist." });
+    }
+    if (toLocRes.rows[0].status === "INACTIVE") {
+      return res.status(400).json({ success: false, message: `Destination location (${toLocRes.rows[0].name}) is inactive and cannot be used for transfers.` });
     }
 
     // 4. Verify product exists

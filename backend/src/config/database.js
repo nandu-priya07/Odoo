@@ -83,6 +83,7 @@ export const createTables = async () => {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(150) NOT NULL,
         address TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -96,6 +97,7 @@ export const createTables = async () => {
         warehouse_id UUID NOT NULL,
 
         name VARCHAR(150) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

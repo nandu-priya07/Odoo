@@ -12,6 +12,7 @@ import transferRoutes from "../routes/transferRoutes.js";
 import adjustmentRoutes from "../routes/adjustmentRoutes.js";
 import stockRoutes from "../routes/stockRoutes.js";
 import warehouseRoutes from "../routes/warehouseRoutes.js";
+import locationRoutes from "../routes/locationRoutes.js";
 import reorderRoutes from "../routes/reorderRoutes.js";
 import stockLedgerRoutes from "../routes/stockLedgerRoutes.js";
 
@@ -43,6 +44,7 @@ app.use("/api/adjustments", adjustmentRoutes);
 app.use("/api/stock", stockRoutes);
 app.use("/api/stock-ledger", stockLedgerRoutes);
 app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/locations", locationRoutes);
 app.use("/api/reorder-rules", reorderRoutes);
 
 

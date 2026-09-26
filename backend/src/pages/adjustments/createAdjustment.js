@@ -43,9 +43,9 @@ export const createAdjustment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Reason is required." });
     }
 
-    // 2. Verify location and warehouse
+    // 2. Verify location and warehouse exist and are active
     const locRes = await pool.query(
-      `SELECT l.id, l.name, w.id AS warehouse_id, w.name AS warehouse_name 
+      `SELECT l.id, l.name, l.status, w.id AS warehouse_id, w.name AS warehouse_name, w.status AS warehouse_status
        FROM locations l 
        JOIN warehouses w ON l.warehouse_id = w.id 
        WHERE l.id = $1`,
@@ -53,6 +53,12 @@ export const createAdjustment = async (req, res) => {
     );
     if (locRes.rows.length === 0) {
       return res.status(400).json({ success: false, message: "Selected location does not exist." });
+    }
+    if (locRes.rows[0].status === "INACTIVE") {
+      return res.status(400).json({ success: false, message: `Location (${locRes.rows[0].name}) is inactive and cannot be used for stock adjustments.` });
+    }
+    if (locRes.rows[0].warehouse_status === "INACTIVE") {
+      return res.status(400).json({ success: false, message: `Warehouse (${locRes.rows[0].warehouse_name}) is inactive and cannot receive adjustments.` });
     }
 
     // 3. Verify product

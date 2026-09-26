@@ -10,6 +10,14 @@ export const createReceipt = async (req, res) => {
       return res.status(400).json({ success: false, message: "Destination Warehouse is required." });
     }
 
+    const whCheck = await client.query("SELECT id, name, status FROM warehouses WHERE id = $1", [warehouseId]);
+    if (whCheck.rows.length === 0) {
+      return res.status(400).json({ success: false, message: "Selected warehouse does not exist." });
+    }
+    if (whCheck.rows[0].status === "INACTIVE") {
+      return res.status(400).json({ success: false, message: `Warehouse (${whCheck.rows[0].name}) is inactive and cannot receive new receipts.` });
+    }
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: "At least one product line item is required." });
     }

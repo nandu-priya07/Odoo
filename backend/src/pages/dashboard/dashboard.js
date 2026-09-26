@@ -49,10 +49,10 @@ export const getDashboard = async (req, res) => {
     const pendingTransfersRes = await pool.query("SELECT COUNT(*) FROM internal_transfers WHERE status IN ('DRAFT', 'WAITING', 'READY')");
     const pendingTransfers = parseInt(pendingTransfersRes.rows[0]?.count || 0);
 
-    const warehousesRes = await pool.query("SELECT id, name FROM warehouses ORDER BY name ASC");
+    const warehousesRes = await pool.query("SELECT id, name, COALESCE(status, 'ACTIVE') AS status FROM warehouses ORDER BY name ASC");
     const categoriesRes = await pool.query("SELECT id, name FROM categories ORDER BY name ASC");
     const suppliersRes = await pool.query("SELECT id, name FROM suppliers ORDER BY name ASC");
-    const locationsRes = await pool.query("SELECT id, name, warehouse_id FROM locations ORDER BY name ASC");
+    const locationsRes = await pool.query("SELECT id, name, warehouse_id, COALESCE(status, 'ACTIVE') AS status FROM locations ORDER BY name ASC");
 
     // 5. Detail Lists for Modal Cards
     const productsListRes = await pool.query(`
