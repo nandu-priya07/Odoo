@@ -1,214 +1,317 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import AdjustmentFilters from "./AdjustmentFilters";
+import AdjustmentTable from "./AdjustmentTable";
 import CreateAdjustmentComponent from "./CreateAdjustmentComponent";
 import AdjustmentDetails from "./AdjustmentDetails";
-import { fetchAdjustments, createAdjustment, validateAdjustment } from "../../services/adjustmentService";
-import "../Dashboard/Dashboard.css";
+import {
+  getAdjustments,
+  getAdjustment,
+  createAdjustment,
+  updateAdjustmentStatus,
+  validateAdjustment,
+  cancelAdjustment,
+} from "../../services/adjustmentService";
+import { fetchWarehouses, fetchLocations } from "../../services/warehouseService";
+import { getProducts } from "../../services/productService";
 
-function AdjustmentsComponent() {
+const AdjustmentsComponent = () => {
   const [adjustments, setAdjustments] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [locations, setLocations] = useState([]);
   const [products, setProducts] = useState([]);
-  const [stockList, setStockList] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: '' }
 
-  const [statusFilter, setStatusFilter] = useState("All");
+  // Filter states
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All");
+  const [warehouse, setWarehouse] = useState("All");
+  const [location, setLocation] = useState("All");
+  const [product, setProduct] = useState("All");
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedAdjId, setSelectedAdjId] = useState(null);
+  // Pagination states
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+  });
 
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await fetchAdjustments(statusFilter, search);
-      setAdjustments(data);
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewingAdjustment, setViewingAdjustment] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-      const res = await fetch("http://localhost:5000/api/dashboard");
-      const json = await res.json();
-      if (json.success && json.data) {
-        setLocations(json.data.locations || []);
-        setProducts(json.data.productsList || json.data.topProducts || []);
-        setStockList(json.data.stockList || []);
+  const showToast = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 4500);
+  };
+
+  // Load auxiliary data for creation & filters
+  useEffect(() => {
+    const loadMetadata = async () => {
+      try {
+        const [whs, locs, prodsRes] = await Promise.all([
+          fetchWarehouses().catch(() => []),
+          fetchLocations().catch(() => []),
+          getProducts({ limit: 100 }).catch(() => ({ data: [] })),
+        ]);
+        setWarehouses(whs || []);
+        setLocations(locs || []);
+        setProducts(prodsRes.data || []);
+      } catch (err) {
+        console.error("Failed to load metadata:", err);
       }
+    };
+    loadMetadata();
+  }, []);
+
+  // Load adjustments list
+  const loadAdjustments = useCallback(
+    async (pageToLoad = pagination.page, limitToLoad = pagination.limit) => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await getAdjustments({
+          search,
+          status,
+          warehouse,
+          location,
+          product,
+          page: pageToLoad,
+          limit: limitToLoad,
+        });
+
+        setAdjustments(res.data || []);
+        if (res.pagination) {
+          setPagination(res.pagination);
+        }
+      } catch (err) {
+        setError(err.message || "Failed to load stock adjustments.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [search, status, warehouse, location, product, pagination.page, pagination.limit]
+  );
+
+  useEffect(() => {
+    loadAdjustments(1, pagination.limit);
+  }, [search, status, warehouse, location, product, pagination.limit]);
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatus("All");
+    setWarehouse("All");
+    setLocation("All");
+    setProduct("All");
+  };
+
+  const handlePageChange = (newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
+    loadAdjustments(newPage, pagination.limit);
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+    loadAdjustments(1, newLimit);
+  };
+
+  // View details
+  const handleView = async (adj) => {
+    try {
+      const details = await getAdjustment(adj.id);
+      setViewingAdjustment(details);
     } catch (err) {
-      console.error("Load adjustments error:", err);
-      setError(err.message || "Failed to load stock adjustments.");
-    } finally {
-      setLoading(false);
+      showToast(err.message || "Unable to load adjustment details.", "error");
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [statusFilter, search]);
-
+  // Create adjustment
   const handleCreateSubmit = async (formData) => {
-    const newAdj = await createAdjustment(formData);
-    setSuccessMsg(`Stock adjustment '${newAdj.adjustment_number}' created successfully!`);
-    loadData();
-    setTimeout(() => setSuccessMsg(""), 3500);
+    try {
+      setSubmitting(true);
+      await createAdjustment(formData);
+      showToast("Stock adjustment created successfully in DRAFT status.");
+      setShowCreateModal(false);
+      loadAdjustments(1, pagination.limit);
+    } catch (err) {
+      showToast(err.message || "Unable to create adjustment.", "error");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleValidate = async (id) => {
+  // Status transition: DRAFT -> WAITING or WAITING -> READY
+  const handleStatusChange = async (adj, targetStatus) => {
     try {
-      const result = await validateAdjustment(id);
-      setSuccessMsg(result.message || "Stock adjustment validated successfully!");
-      loadData();
-      setTimeout(() => setSuccessMsg(""), 3500);
+      await updateAdjustmentStatus(adj.id, targetStatus);
+      showToast(`Adjustment ${adj.adjustment_number} moved to ${targetStatus}.`);
+      loadAdjustments(pagination.page, pagination.limit);
     } catch (err) {
-      alert(err.message || "Failed to validate adjustment.");
+      showToast(err.message || "Failed to update status", "error");
+    }
+  };
+
+  // Validate adjustment (READY -> DONE, sets stock.quantity = physicalCount, records ledger entry)
+  const handleValidate = async (adj) => {
+    const diff = parseFloat(adj.difference);
+    const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+    const confirmed = window.confirm(
+      `Are you sure you want to validate adjustment "${adj.adjustment_number}"?\n\nThis will reconcile recorded stock to the counted physical quantity of ${adj.counted_quantity} ${adj.unit_of_measure} (difference: ${diffStr} ${adj.unit_of_measure}).\n\nA Stock Ledger entry will be created.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await validateAdjustment(adj.id);
+      showToast(`Adjustment ${adj.adjustment_number} validated successfully! Stock reconciled.`);
+      loadAdjustments(pagination.page, pagination.limit);
+    } catch (err) {
+      showToast(err.message || "Unable to validate adjustment.", "error");
+    }
+  };
+
+  // Cancel adjustment
+  const handleCancel = async (adj) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel adjustment "${adj.adjustment_number}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await cancelAdjustment(adj.id);
+      showToast(`Adjustment ${adj.adjustment_number} has been canceled.`);
+      loadAdjustments(pagination.page, pagination.limit);
+    } catch (err) {
+      showToast(err.message || "Failed to cancel adjustment", "error");
     }
   };
 
   return (
-    <div className="dashboard-page">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1>StockSense Inventory Adjustments</h1>
-          <p>Reconcile system recorded stock against physical counted inventory levels.</p>
-        </div>
-
-        <div className="header-actions">
-          <button className="action-btn" onClick={() => setIsCreateOpen(true)}>
-            + Create Stock Adjustment
-          </button>
-        </div>
-      </div>
-
-      {successMsg && (
-        <div className="alert-banner success-banner" style={{ marginBottom: "1.5rem" }}>
-          ✅ {successMsg}
+    <div className="dashboard-container">
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          style={{
+            position: "fixed",
+            top: "24px",
+            right: "24px",
+            zIndex: 9999,
+            padding: "12px 20px",
+            borderRadius: "6px",
+            fontSize: "14px",
+            fontWeight: 500,
+            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+            backgroundColor: notification.type === "error" ? "#fee2e2" : "#dcfce7",
+            color: notification.type === "error" ? "#991b1b" : "#166534",
+            border: `1px solid ${notification.type === "error" ? "#f87171" : "#86efac"}`,
+          }}
+        >
+          {notification.type === "error" ? "✕ " : "✓ "} {notification.message}
         </div>
       )}
 
+      {/* Header */}
+      <div
+        className="dashboard-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <div>
+          <h1 className="dashboard-title" style={{ margin: 0, fontSize: "24px", fontWeight: 700 }}>
+            Stock Adjustments
+          </h1>
+          <p className="dashboard-subtitle" style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "14px" }}>
+            Reconcile recorded stock with physical inventory counts.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => setShowCreateModal(true)}
+          style={{ padding: "9px 18px", fontSize: "14px", fontWeight: 600 }}
+        >
+          + New Adjustment
+        </button>
+      </div>
+
+      {/* Inline Error */}
       {error && (
-        <div className="alert-banner error-banner" style={{ marginBottom: "1.5rem" }}>
-          ⚠️ {error}
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "#fee2e2",
+            color: "#991b1b",
+            borderRadius: "6px",
+            marginBottom: "16px",
+            fontSize: "14px",
+          }}
+        >
+          {error}
         </div>
       )}
 
       {/* Filters */}
-      <section className="filter-section">
-        <div className="search-bar-wrapper">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="🔍 Search adjustment reference, location, or reason..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div className="dashboard-filters">
-          <div className="filter-group">
-            <label htmlFor="adjStatusFilter">Status</label>
-            <select
-              id="adjStatusFilter"
-              className="form-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="WAITING">Waiting</option>
-              <option value="READY">Ready</option>
-              <option value="DONE">Done (Validated)</option>
-            </select>
-          </div>
-
-          <button className="reset-btn" onClick={() => { setSearch(""); setStatusFilter("All"); }}>
-            Reset Filters
-          </button>
-        </div>
-      </section>
-
-      {/* Table */}
-      {loading ? (
-        <p style={{ color: "#64748b", padding: "1rem" }}>Loading stock adjustments...</p>
-      ) : (
-        <div className="table-container shadow-table">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Adjustment Reference</th>
-                <th>Location</th>
-                <th>Reason</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adjustments.length > 0 ? (
-                adjustments.map((a) => (
-                  <tr key={a.id}>
-                    <td><strong>{a.adjustment_number}</strong></td>
-                    <td>{a.location_name || "Main Area"}</td>
-                    <td>{a.reason || "Physical count verification"}</td>
-                    <td>
-                      <span className={`status-badge ${(a.status || 'DRAFT').toLowerCase()}`}>
-                        {a.status}
-                      </span>
-                    </td>
-                    <td>{new Date(a.created_at).toLocaleDateString()}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
-                        <button
-                          className="action-btn"
-                          style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}
-                          onClick={() => setSelectedAdjId(a.id)}
-                        >
-                          View Details
-                        </button>
-                        {a.status !== "DONE" && (
-                          <button
-                            className="btn-primary"
-                            style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}
-                            onClick={() => handleValidate(a.id)}
-                          >
-                            Apply Count ✓
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: "center", padding: "2rem", color: "#64748b" }}>
-                    No stock adjustments found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Create Adjustment Modal */}
-      <CreateAdjustmentComponent
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreateSubmit}
+      <AdjustmentFilters
+        search={search}
+        setSearch={setSearch}
+        status={status}
+        setStatus={setStatus}
+        warehouse={warehouse}
+        setWarehouse={setWarehouse}
+        location={location}
+        setLocation={setLocation}
+        product={product}
+        setProduct={setProduct}
+        warehouses={warehouses}
         locations={locations}
         products={products}
-        stockList={stockList}
+        onReset={handleResetFilters}
       />
 
-      {/* Adjustment Details Modal */}
-      {selectedAdjId && (
+      {/* Table */}
+      <AdjustmentTable
+        adjustments={adjustments}
+        loading={loading}
+        pagination={pagination}
+        onPageChange={handlePageChange}
+        onLimitChange={handleLimitChange}
+        onView={handleView}
+        onStatusChange={handleStatusChange}
+        onValidate={handleValidate}
+        onCancel={handleCancel}
+      />
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <CreateAdjustmentComponent
+          warehouses={warehouses}
+          locations={locations}
+          products={products}
+          onSubmit={handleCreateSubmit}
+          onCancel={() => setShowCreateModal(false)}
+          submitting={submitting}
+        />
+      )}
+
+      {/* View Details Modal */}
+      {viewingAdjustment && (
         <AdjustmentDetails
-          adjustmentId={selectedAdjId}
-          onClose={() => setSelectedAdjId(null)}
-          onValidated={loadData}
+          adjustment={viewingAdjustment}
+          onClose={() => setViewingAdjustment(null)}
         />
       )}
     </div>
   );
-}
+};
 
 export default AdjustmentsComponent;
