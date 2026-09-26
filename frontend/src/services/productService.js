@@ -1,14 +1,38 @@
 const API_BASE_URL = "http://localhost:5000/api";
 
-export const fetchProducts = async (search = "", category = "All") => {
-  const params = new URLSearchParams();
-  if (search) params.append("search", search);
-  if (category && category !== "All") params.append("category", category);
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token") || localStorage.getItem("stocksense_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
-  const res = await fetch(`${API_BASE_URL}/products?${params.toString()}`);
+export const getProducts = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  if (params.search) queryParams.append("search", params.search);
+  if (params.category && params.category !== "All") queryParams.append("category", params.category);
+  if (params.stockStatus && params.stockStatus !== "All") queryParams.append("stockStatus", params.stockStatus);
+  if (params.page) queryParams.append("page", params.page);
+  if (params.limit) queryParams.append("limit", params.limit);
+
+  const res = await fetch(`${API_BASE_URL}/products?${queryParams.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   const json = await res.json();
   if (!res.ok || !json.success) {
-    throw new Error(json.message || "Failed to fetch products");
+    throw new Error(json.message || "Unable to load products.");
+  }
+  return json;
+};
+
+export const getProduct = async (id) => {
+  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Failed to fetch product details");
   }
   return json.data;
 };
@@ -16,7 +40,7 @@ export const fetchProducts = async (search = "", category = "All") => {
 export const createProduct = async (productData) => {
   const res = await fetch(`${API_BASE_URL}/products`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(productData),
   });
   const json = await res.json();
@@ -29,7 +53,7 @@ export const createProduct = async (productData) => {
 export const updateProduct = async (id, productData) => {
   const res = await fetch(`${API_BASE_URL}/products/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(productData),
   });
   const json = await res.json();
@@ -42,17 +66,49 @@ export const updateProduct = async (id, productData) => {
 export const deleteProduct = async (id) => {
   const res = await fetch(`${API_BASE_URL}/products/${id}`, {
     method: "DELETE",
+    headers: getAuthHeaders(),
   });
   const json = await res.json();
   if (!res.ok || !json.success) {
-    throw new Error(json.message || "Failed to delete product");
+    throw new Error(json.message || "This product cannot be deleted because it has inventory history.");
   }
   return json;
 };
 
+export const getProductStock = async (id) => {
+  const res = await fetch(`${API_BASE_URL}/products/${id}/stock`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Failed to fetch stock for product");
+  }
+  return json.data;
+};
+
+export const getCategories = async () => {
+  const res = await fetch(`${API_BASE_URL}/categories`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Failed to fetch categories");
+  }
+  return json.data;
+};
+
+export const fetchProducts = async (search = "", category = "All") => {
+  const result = await getProducts({ search, category, limit: 100 });
+  return result.data || [];
+};
+
 export default {
+  getProducts,
   fetchProducts,
+  getProduct,
   createProduct,
   updateProduct,
   deleteProduct,
+  getProductStock,
+  getCategories,
 };

@@ -14,7 +14,12 @@ dotenv.config();
 const { Pool, Client } = pg;
 
 const connectionString = process.env.DATABASE_URL || process.env.Connection_string;
-const isSupabase = Boolean(connectionString && connectionString.includes("supabase.co"));
+const isSupabase = Boolean(
+  connectionString &&
+    (connectionString.includes("supabase.co") ||
+      connectionString.includes("supabase.com") ||
+      connectionString.includes("pooler.supabase"))
+);
 
 const poolConfig = {
   connectionString: connectionString,

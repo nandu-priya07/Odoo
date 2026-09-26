@@ -1,42 +1,130 @@
-import "../Dashboard/Dashboard.css";
+import React from "react";
 
-function ProductFilters({ search, onSearchChange, category, onCategoryChange, categories = [], onReset }) {
+const ProductFilters = ({
+  search,
+  setSearch,
+  category,
+  setCategory,
+  stockStatus,
+  setStockStatus,
+  categories,
+  onReset,
+}) => {
   return (
-    <section className="filter-section">
-      <div className="search-bar-wrapper">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="🔍 Search products by name or SKU..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
+    <div
+      className="card"
+      style={{
+        padding: "16px 20px",
+        marginBottom: "20px",
+        background: "#ffffff",
+        borderRadius: "8px",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+          alignItems: "flex-end",
+        }}
+      >
+        {/* Search bar */}
+        <div style={{ flex: "1 1 240px" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#64748b",
+              marginBottom: "6px",
+            }}
+          >
+            Search Products
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search by name or SKU..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "8px 12px", fontSize: "14px" }}
+          />
+        </div>
 
-      <div className="dashboard-filters">
-        <div className="filter-group">
-          <label htmlFor="prodCategoryFilter">Category</label>
+        {/* Category filter */}
+        <div style={{ flex: "1 1 180px" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#64748b",
+              marginBottom: "6px",
+            }}
+          >
+            Category
+          </label>
           <select
-            id="prodCategoryFilter"
-            className="form-select"
+            className="form-control"
             value={category}
-            onChange={(e) => onCategoryChange(e.target.value)}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ width: "100%", padding: "8px 12px", fontSize: "14px" }}
           >
             <option value="All">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id || c.name} value={c.name}>
-                {c.name}
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
               </option>
             ))}
           </select>
         </div>
 
-        <button className="reset-btn" onClick={onReset}>
-          Reset Filters
-        </button>
+        {/* Stock Status filter */}
+        <div style={{ flex: "1 1 160px" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#64748b",
+              marginBottom: "6px",
+            }}
+          >
+            Stock Status
+          </label>
+          <select
+            className="form-control"
+            value={stockStatus}
+            onChange={(e) => setStockStatus(e.target.value)}
+            style={{ width: "100%", padding: "8px 12px", fontSize: "14px" }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="In Stock">In Stock</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
+        </div>
+
+        {/* Reset Filters button */}
+        <div>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onReset}
+            style={{
+              padding: "8px 16px",
+              fontSize: "14px",
+              color: "#64748b",
+              borderColor: "#cbd5e1",
+            }}
+          >
+            Reset Filters
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   );
-}
+};
 
 export default ProductFilters;

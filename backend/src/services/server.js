@@ -21,6 +21,8 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config();
 
 
+import { getCategories } from "../pages/products/product.js";
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -33,6 +35,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/products", productRoutes);
+app.get("/api/categories", getCategories);
 app.use("/api/receipts", receiptRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/api/adjustments", adjustmentRoutes);

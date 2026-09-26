@@ -1,199 +1,286 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ProductFilters from "./ProductFilters";
 import ProductTable from "./ProductTable";
 import ProductForm from "./ProductForm";
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../../services/productService";
-import "../Dashboard/Dashboard.css";
+import ProductDetailsModal from "./ProductDetailsModal";
+import {
+  getProducts,
+  getProduct,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getCategories,
+} from "../../services/productService";
 
-function ProductsComponent() {
+const ProductsComponent = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: '' }
 
+  // Filter states
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [stockStatus, setStockStatus] = useState("All");
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  // Pagination states
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+  });
+
+  // Modal states
+  const [showFormModal, setShowFormModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [viewingProduct, setViewingProduct] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const loadProducts = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await fetchProducts(search, category);
-      setProducts(data);
-
-      // Also fetch categories from dashboard endpoint for filter
-      const res = await fetch("http://localhost:5000/api/dashboard");
-      const json = await res.json();
-      if (json.success && json.data?.categories) {
-        setCategories(json.data.categories);
-      }
-    } catch (err) {
-      console.error("Load products error:", err);
-      setError(err.message || "Failed to load products");
-    } finally {
-      setLoading(false);
-    }
+  // Show auto-dismissing toast notification
+  const showToast = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 4000);
   };
 
+  // Load categories
   useEffect(() => {
-    loadProducts();
-  }, [search, category]);
+    const fetchCats = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats || []);
+      } catch (err) {
+        console.error("Failed to load categories:", err);
+      }
+    };
+    fetchCats();
+  }, []);
 
+  // Load products
+  const loadProducts = useCallback(
+    async (pageToLoad = pagination.page, limitToLoad = pagination.limit) => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await getProducts({
+          search,
+          category,
+          stockStatus,
+          page: pageToLoad,
+          limit: limitToLoad,
+        });
+
+        setProducts(res.data || []);
+        if (res.pagination) {
+          setPagination(res.pagination);
+        }
+      } catch (err) {
+        setError(err.message || "Unable to load products.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [search, category, stockStatus, pagination.page, pagination.limit]
+  );
+
+  // Initial load and filter change trigger
+  useEffect(() => {
+    loadProducts(1, pagination.limit);
+  }, [search, category, stockStatus, pagination.limit]);
+
+  // Reset all filters
   const handleResetFilters = () => {
     setSearch("");
     setCategory("All");
+    setStockStatus("All");
   };
 
-  const handleOpenAdd = () => {
-    setEditingProduct(null);
-    setIsFormOpen(true);
+  // Page changes
+  const handlePageChange = (newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
+    loadProducts(newPage, pagination.limit);
   };
 
-  const handleOpenEdit = (prod) => {
-    setEditingProduct(prod);
-    setIsFormOpen(true);
+  const handleLimitChange = (newLimit) => {
+    setPagination((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+    loadProducts(1, newLimit);
   };
 
-  const handleFormSubmit = async (formData) => {
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, formData);
-      setSuccessMsg(`Product '${formData.name}' updated successfully!`);
-    } else {
-      await createProduct(formData);
-      setSuccessMsg(`Product '${formData.name}' created successfully!`);
-    }
-    loadProducts();
-    setTimeout(() => setSuccessMsg(""), 3000);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
+  // View details
+  const handleView = async (product) => {
     try {
-      await deleteProduct(id);
-      setSuccessMsg("Product deleted successfully.");
-      loadProducts();
-      setTimeout(() => setSuccessMsg(""), 3000);
+      const details = await getProduct(product.id);
+      setViewingProduct(details);
     } catch (err) {
-      alert(err.message || "Failed to delete product.");
+      showToast(err.message || "Unable to load product details.", "error");
+    }
+  };
+
+  // Open edit modal
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setShowFormModal(true);
+  };
+
+  // Submit product create/update
+  const handleFormSubmit = async (formData) => {
+    try {
+      setSubmitting(true);
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, formData);
+        showToast("Product updated successfully.");
+      } else {
+        await createProduct(formData);
+        showToast("Product created successfully.");
+      }
+      setShowFormModal(false);
+      setEditingProduct(null);
+      loadProducts(pagination.page, pagination.limit);
+    } catch (err) {
+      showToast(err.message || "Operation failed", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete product
+  const handleDelete = async (product) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${product.name}" (${product.sku})?`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteProduct(product.id);
+      showToast("Product deleted successfully.");
+      loadProducts(pagination.page, pagination.limit);
+    } catch (err) {
+      showToast(err.message || "This product cannot be deleted because it has inventory history.", "error");
     }
   };
 
   return (
-    <div className="dashboard-page">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1>StockSense Product Catalog</h1>
-          <p>Manage product items, SKU codes, categories, and initial stock settings.</p>
-        </div>
-
-        <div className="header-actions">
-          <button className="action-btn" onClick={handleOpenAdd}>
-            + Add New Product
-          </button>
-        </div>
-      </div>
-
-      {successMsg && (
-        <div className="alert-banner success-banner" style={{ marginBottom: "1.5rem" }}>
-          ✅ {successMsg}
+    <div className="dashboard-container">
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          style={{
+            position: "fixed",
+            top: "24px",
+            right: "24px",
+            zIndex: 9999,
+            padding: "12px 20px",
+            borderRadius: "6px",
+            fontSize: "14px",
+            fontWeight: 500,
+            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+            backgroundColor: notification.type === "error" ? "#fee2e2" : "#dcfce7",
+            color: notification.type === "error" ? "#991b1b" : "#166534",
+            border: `1px solid ${notification.type === "error" ? "#f87171" : "#86efac"}`,
+          }}
+        >
+          {notification.type === "error" ? "✕ " : "✓ "} {notification.message}
         </div>
       )}
 
+      {/* Header */}
+      <div
+        className="dashboard-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <div>
+          <h1 className="dashboard-title" style={{ margin: 0, fontSize: "24px", fontWeight: 700 }}>
+            Products
+          </h1>
+          <p className="dashboard-subtitle" style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "14px" }}>
+            Manage your inventory products and stock information.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            setEditingProduct(null);
+            setShowFormModal(true);
+          }}
+          style={{ padding: "9px 18px", fontSize: "14px", fontWeight: 600 }}
+        >
+          + New Product
+        </button>
+      </div>
+
+      {/* Inline Error if any */}
       {error && (
-        <div className="alert-banner error-banner" style={{ marginBottom: "1.5rem" }}>
-          ⚠️ {error}
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "#fee2e2",
+            color: "#991b1b",
+            borderRadius: "6px",
+            marginBottom: "16px",
+            fontSize: "14px",
+          }}
+        >
+          {error}
         </div>
       )}
 
       {/* Filters */}
       <ProductFilters
         search={search}
-        onSearchChange={setSearch}
+        setSearch={setSearch}
         category={category}
-        onCategoryChange={setCategory}
+        setCategory={setCategory}
+        stockStatus={stockStatus}
+        setStockStatus={setStockStatus}
         categories={categories}
         onReset={handleResetFilters}
       />
 
       {/* Table */}
-      {loading ? (
-        <p style={{ color: "#64748b", padding: "1rem" }}>Loading product catalog...</p>
-      ) : (
-        <ProductTable
-          products={products}
-          onEdit={handleOpenEdit}
-          onDelete={handleDelete}
-          onViewDetails={setViewingProduct}
+      <ProductTable
+        products={products}
+        loading={loading}
+        pagination={pagination}
+        onPageChange={handlePageChange}
+        onLimitChange={handleLimitChange}
+        onView={handleView}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+
+      {/* Create / Edit Modal */}
+      {showFormModal && (
+        <ProductForm
+          initialData={editingProduct}
+          categories={categories}
+          onSubmit={handleFormSubmit}
+          onCancel={() => {
+            setShowFormModal(false);
+            setEditingProduct(null);
+          }}
+          submitting={submitting}
         />
       )}
 
-      {/* Product Form Modal */}
-      <ProductForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSubmit={handleFormSubmit}
-        initialData={editingProduct}
-        categories={categories}
-      />
-
       {/* View Details Modal */}
       {viewingProduct && (
-        <div className="modal-overlay" onClick={() => setViewingProduct(null)}>
-          <div className="modal-content" style={{ maxWidth: "550px" }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Product Details - {viewingProduct.name}</h2>
-              <button className="modal-close-btn" onClick={() => setViewingProduct(null)}>✕</button>
-            </div>
-            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div className="form-row-2">
-                <div>
-                  <strong>SKU / Code:</strong>
-                  <p><span className="sku-tag">{viewingProduct.sku}</span></p>
-                </div>
-                <div>
-                  <strong>Category:</strong>
-                  <p>{viewingProduct.category_name || "General"}</p>
-                </div>
-              </div>
-
-              <div className="form-row-2">
-                <div>
-                  <strong>Unit of Measure:</strong>
-                  <p>{viewingProduct.unit_of_measure || "pcs"}</p>
-                </div>
-                <div>
-                  <strong>Total Stock:</strong>
-                  <p><strong>{viewingProduct.total_stock || viewingProduct.initial_stock || 0}</strong> {viewingProduct.unit_of_measure || "pcs"}</p>
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-secondary" onClick={() => setViewingProduct(null)}>
-                  Close
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={() => {
-                    const target = viewingProduct;
-                    setViewingProduct(null);
-                    handleOpenEdit(target);
-                  }}
-                >
-                  Edit Product
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProductDetailsModal
+          product={viewingProduct}
+          onClose={() => setViewingProduct(null)}
+        />
       )}
     </div>
   );
-}
+};
 
 export default ProductsComponent;
