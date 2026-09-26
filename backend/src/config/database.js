@@ -193,6 +193,12 @@ export const createTables = async () => {
 
         status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
 
+        recipient_address TEXT,
+
+        net_qty NUMERIC(15,2) DEFAULT 0,
+
+        receipt_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
         created_by UUID,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -214,6 +220,10 @@ export const createTables = async () => {
           REFERENCES users(id)
           ON DELETE SET NULL
       );
+
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS recipient_address TEXT;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS net_qty NUMERIC(15,2) DEFAULT 0;
+      ALTER TABLE receipts ADD COLUMN IF NOT EXISTS receipt_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 
       /* =========================================

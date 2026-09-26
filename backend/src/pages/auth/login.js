@@ -44,12 +44,14 @@ const login = async (req, res) => {
     }
 
     // Create JWT
+    const jwtSecret = process.env.JWT_SECRET || "stocksense_jwt_secret_key_2026";
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
+        role: user.role || "warehouse_staff",
       },
-      process.env.JWT_SECRET,
+      jwtSecret,
       {
         expiresIn: "7d",
       }
@@ -64,6 +66,7 @@ const login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role || "Inventory Manager",
       },
     });
   } catch (error) {
