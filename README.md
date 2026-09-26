@@ -213,8 +213,6 @@ Open your browser at:
 - 📊 **Advanced Analytics & Export**: Custom report generation with PDF/Excel exports.
 - 🔔 **Real-Time Push Notifications**: WebSockets integration for low-stock alerts.
 
----
 
-## 📝 License
 
 Distributed under the ISC License.
