@@ -13,6 +13,7 @@ import adjustmentRoutes from "../routes/adjustmentRoutes.js";
 import stockRoutes from "../routes/stockRoutes.js";
 import warehouseRoutes from "../routes/warehouseRoutes.js";
 import reorderRoutes from "../routes/reorderRoutes.js";
+import stockLedgerRoutes from "../routes/stockLedgerRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +41,7 @@ app.use("/api/receipts", receiptRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/api/adjustments", adjustmentRoutes);
 app.use("/api/stock", stockRoutes);
+app.use("/api/stock-ledger", stockLedgerRoutes);
 app.use("/api/warehouses", warehouseRoutes);
 app.use("/api/reorder-rules", reorderRoutes);
 

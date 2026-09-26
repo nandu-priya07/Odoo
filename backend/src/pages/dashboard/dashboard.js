@@ -323,10 +323,16 @@ export const createOperation = async (req, res) => {
             [pId, locId, pQty]
           );
 
+          const stockRes = await pool.query(
+            `SELECT quantity FROM stock WHERE product_id = $1 AND location_id = $2`,
+            [pId, locId]
+          );
+          const currentQty = stockRes.rows[0]?.quantity || pQty;
+
           await pool.query(
-            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, quantity_change, quantity_after)
-             VALUES ($1, $2, 'RECEIPT', $3, $3)`,
-            [pId, locId, pQty]
+            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_id, quantity_change, quantity_after)
+             VALUES ($1, $2, 'RECEIPT', $3, $4, $5)`,
+            [pId, locId, result.rows[0].id, pQty, currentQty]
           );
         }
       }
@@ -363,18 +369,20 @@ export const createOperation = async (req, res) => {
         );
 
         if ((status === "DONE" || status === "READY") && locId) {
-          await pool.query(
+          const updStock = await pool.query(
             `INSERT INTO stock (product_id, location_id, quantity)
              VALUES ($1, $2, 0)
              ON CONFLICT (product_id, location_id)
-             DO UPDATE SET quantity = GREATEST(0, stock.quantity - $3), updated_at = CURRENT_TIMESTAMP`,
+             DO UPDATE SET quantity = GREATEST(0, stock.quantity - $3), updated_at = CURRENT_TIMESTAMP
+             RETURNING quantity`,
             [productId, locId, qtyNum]
           );
+          const qtyAfter = updStock.rows[0]?.quantity || 0;
 
           await pool.query(
-            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, quantity_change, quantity_after)
-             VALUES ($1, $2, 'DELIVERY', -$3, 0)`,
-            [productId, locId, qtyNum]
+            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_id, quantity_change, quantity_after)
+             VALUES ($1, $2, 'DELIVERY', $3, -$4, $5)`,
+            [productId, locId, result.rows[0].id, qtyNum, qtyAfter]
           );
         }
       }
@@ -412,26 +420,38 @@ export const createOperation = async (req, res) => {
         );
 
         if ((status === "DONE" || status === "READY") && fLoc && tLoc) {
-          await pool.query(
+          const srcStock = await pool.query(
             `INSERT INTO stock (product_id, location_id, quantity)
              VALUES ($1, $2, 0)
              ON CONFLICT (product_id, location_id)
-             DO UPDATE SET quantity = GREATEST(0, stock.quantity - $3), updated_at = CURRENT_TIMESTAMP`,
+             DO UPDATE SET quantity = GREATEST(0, stock.quantity - $3), updated_at = CURRENT_TIMESTAMP
+             RETURNING quantity`,
             [productId, fLoc, qtyNum]
           );
+          const srcQtyAfter = srcStock.rows[0]?.quantity || 0;
 
-          await pool.query(
+          const dstStock = await pool.query(
             `INSERT INTO stock (product_id, location_id, quantity)
              VALUES ($1, $2, $3)
              ON CONFLICT (product_id, location_id)
-             DO UPDATE SET quantity = stock.quantity + $3, updated_at = CURRENT_TIMESTAMP`,
+             DO UPDATE SET quantity = stock.quantity + $3, updated_at = CURRENT_TIMESTAMP
+             RETURNING quantity`,
             [productId, tLoc, qtyNum]
           );
+          const dstQtyAfter = dstStock.rows[0]?.quantity || qtyNum;
 
+          // TRANSFER_OUT for source location
           await pool.query(
-            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, quantity_change, quantity_after)
-             VALUES ($1, $2, 'TRANSFER_IN', $3, $3)`,
-            [productId, tLoc, qtyNum]
+            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_id, quantity_change, quantity_after)
+             VALUES ($1, $2, 'TRANSFER_OUT', $3, -$4, $5)`,
+            [productId, fLoc, result.rows[0].id, qtyNum, srcQtyAfter]
+          );
+
+          // TRANSFER_IN for destination location
+          await pool.query(
+            `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_id, quantity_change, quantity_after)
+             VALUES ($1, $2, 'TRANSFER_IN', $3, $4, $5)`,
+            [productId, tLoc, result.rows[0].id, qtyNum, dstQtyAfter]
           );
         }
       }

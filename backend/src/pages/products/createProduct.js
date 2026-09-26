@@ -64,8 +64,8 @@ export const createProduct = async (req, res) => {
         );
 
         await pool.query(
-          `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_no, quantity_change, quantity_after)
-           VALUES ($1, $2, 'RECEIPT', 'INITIAL-STOCK', $3, $3)`,
+          `INSERT INTO stock_ledger (product_id, location_id, transaction_type, quantity_change, quantity_after)
+           VALUES ($1, $2, 'RECEIPT', $3, $3)`,
           [newProduct.id, locationId, initStockNum]
         );
       }

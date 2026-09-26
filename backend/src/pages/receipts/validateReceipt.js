@@ -43,9 +43,9 @@ export const validateReceipt = async (req, res) => {
 
         // Log stock movement
         await client.query(
-          `INSERT INTO stock_ledger (product_id, location_id, transaction_type, quantity_change, quantity_after)
-           VALUES ($1, $2, 'RECEIPT', $3, $4)`,
-          [item.product_id, locId, qtyNum, newQtyAfter]
+          `INSERT INTO stock_ledger (product_id, location_id, transaction_type, reference_id, quantity_change, quantity_after, created_by)
+           VALUES ($1, $2, 'RECEIPT', $3, $4, $5, $6)`,
+          [item.product_id, locId, id, qtyNum, newQtyAfter, receipt.created_by || req.user?.id || null]
         );
       }
     }
