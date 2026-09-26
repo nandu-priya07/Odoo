@@ -1,82 +1,134 @@
 import { pool } from "../../config/database.js";
 
+// GET /api/transfers - List with search, filters, pagination
 export const getTransfers = async (req, res) => {
   try {
-    const { status, search } = req.query;
+    const { search, status, warehouse, page = 1, limit = 20 } = req.query;
 
-    let query = `
-      SELECT 
-        t.id,
-        t.transfer_number,
-        t.from_location_id,
-        t.to_location_id,
-        t.status,
-        t.created_at,
-        t.updated_at,
-        fl.name AS from_location,
-        tl.name AS to_location
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 20);
+    const offset = (pageNum - 1) * limitNum;
+
+    let baseQuery = `
       FROM internal_transfers t
-      LEFT JOIN locations fl ON t.from_location_id = fl.id
-      LEFT JOIN locations tl ON t.to_location_id = tl.id
+      JOIN locations fl ON t.from_location_id = fl.id
+      JOIN warehouses fw ON fl.warehouse_id = fw.id
+      JOIN locations tl ON t.to_location_id = tl.id
+      JOIN warehouses tw ON tl.warehouse_id = tw.id
+      LEFT JOIN transfer_items ti ON t.id = ti.transfer_id
+      LEFT JOIN products p ON ti.product_id = p.id
+      LEFT JOIN users u ON t.created_by = u.id
       WHERE 1=1
     `;
 
     const params = [];
-    let paramIdx = 1;
+    let paramIndex = 1;
 
     if (search && search.trim()) {
-      query += ` AND (t.transfer_number ILIKE $${paramIdx} OR fl.name ILIKE $${paramIdx} OR tl.name ILIKE $${paramIdx})`;
+      baseQuery += ` AND (t.transfer_number ILIKE $${paramIndex} OR p.name ILIKE $${paramIndex} OR p.sku ILIKE $${paramIndex})`;
       params.push(`%${search.trim()}%`);
-      paramIdx++;
+      paramIndex++;
     }
 
     if (status && status !== "All") {
-      query += ` AND t.status = $${paramIdx}`;
+      baseQuery += ` AND t.status = $${paramIndex}`;
       params.push(status);
-      paramIdx++;
+      paramIndex++;
     }
 
-    query += ` ORDER BY t.created_at DESC`;
+    if (warehouse && warehouse !== "All") {
+      baseQuery += ` AND (fw.id::text = $${paramIndex} OR fw.name = $${paramIndex} OR tw.id::text = $${paramIndex} OR tw.name = $${paramIndex})`;
+      params.push(warehouse);
+      paramIndex++;
+    }
 
-    const result = await pool.query(query, params);
-    return res.status(200).json({ success: true, data: result.rows });
+    // Total count query
+    const countSql = `SELECT COUNT(DISTINCT t.id) ${baseQuery}`;
+    const countRes = await pool.query(countSql, params);
+    const totalRecords = parseInt(countRes.rows[0]?.count || 0);
+
+    // List query
+    const listSql = `
+      SELECT 
+        t.id,
+        t.transfer_number,
+        t.status,
+        t.created_at,
+        t.updated_at,
+        fl.id AS from_location_id,
+        fl.name AS from_location_name,
+        fw.id AS from_warehouse_id,
+        fw.name AS from_warehouse_name,
+        tl.id AS to_location_id,
+        tl.name AS to_location_name,
+        tw.id AS to_warehouse_id,
+        tw.name AS to_warehouse_name,
+        ti.product_id,
+        COALESCE(p.name, 'N/A') AS product_name,
+        COALESCE(p.sku, 'N/A') AS sku,
+        COALESCE(p.unit_of_measure, 'units') AS unit_of_measure,
+        COALESCE(ti.quantity, 0) AS quantity,
+        COALESCE(u.name, 'Admin') AS created_by_name
+      ${baseQuery}
+      ORDER BY t.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    params.push(limitNum, offset);
+
+    const result = await pool.query(listSql, params);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total: totalRecords,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+      },
+    });
   } catch (error) {
     console.error("Get transfers error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch internal transfers" });
+    return res.status(500).json({ success: false, message: "Failed to fetch transfers" });
   }
 };
 
-export const getTransferById = async (req, res) => {
+// GET /api/transfers/stock?productId=...&locationId=...
+export const getLocationStock = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { productId, locationId } = req.query;
 
-    const transferRes = await pool.query(
-      `SELECT t.*, fl.name AS from_location, tl.name AS to_location
-       FROM internal_transfers t
-       LEFT JOIN locations fl ON t.from_location_id = fl.id
-       LEFT JOIN locations tl ON t.to_location_id = tl.id
-       WHERE t.id = $1`,
-      [id]
-    );
-
-    if (transferRes.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Transfer not found" });
+    if (!productId || !locationId) {
+      return res.status(400).json({
+        success: false,
+        message: "productId and locationId are required",
+      });
     }
 
-    const transfer = transferRes.rows[0];
-
-    const itemsRes = await pool.query(
-      `SELECT ti.*, p.name AS product_name, p.sku, p.unit_of_measure
-       FROM transfer_items ti
-       JOIN products p ON ti.product_id = p.id
-       WHERE ti.transfer_id = $1`,
-      [id]
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(quantity), 0) AS available_stock 
+       FROM stock 
+       WHERE product_id = $1 AND location_id = $2`,
+      [productId, locationId]
     );
 
-    transfer.items = itemsRes.rows;
-    return res.status(200).json({ success: true, data: transfer });
+    const availableStock = parseFloat(result.rows[0]?.available_stock || 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        productId,
+        locationId,
+        availableStock,
+      },
+    });
   } catch (error) {
-    console.error("Get transfer error:", error);
-    return res.status(500).json({ success: false, message: "Failed to fetch transfer details" });
+    console.error("Get location stock error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch location stock" });
   }
+};
+
+export default {
+  getTransfers,
+  getLocationStock,
 };
