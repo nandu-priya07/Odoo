@@ -30,14 +30,14 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
+        {/* Public & Application Shell Routes */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* Authenticated / Module Routes */}
+        {/* Authenticated Module Routes with Navbar Layout */}
         <Route element={<MainLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/products" element={<Products />} />
           <Route path="/receipts" element={<Receipts />} />
           <Route path="/deliveries" element={<Deliveries />} />
