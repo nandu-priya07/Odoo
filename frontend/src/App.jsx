@@ -19,9 +19,11 @@ const MainLayout = () => {
   return (
     <div className="app-container">
       <Navbar />
-      <main className="main-content">
-        <Outlet />
-      </main>
+      <div className="main-content">
+        <main className="app-page-wrapper">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };

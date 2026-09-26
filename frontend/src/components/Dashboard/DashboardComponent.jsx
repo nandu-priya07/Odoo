@@ -709,157 +709,82 @@ function DashboardComponent() {
   ];
 
   return (
-    <div className="dashboard-app-shell">
-      {/* Mobile Drawer Backdrop */}
-      {sidebarOpen && (
-        <div
-          className="dash-sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* ============================================================ */}
-      {/* SIDEBAR                                                      */}
-      {/* ============================================================ */}
-      <aside
-        className={`dash-sidebar${sidebarOpen ? " dash-sidebar--open" : ""}`}
-        aria-label="Application Navigation"
-      >
-        <Link to="/dashboard" className="dash-sidebar__brand">
-          <span className="dash-sidebar__brand-mark">
-            <BrandMark />
-          </span>
-          <div className="dash-sidebar__brand-text">
-            <span className="dash-sidebar__brand-name">StockSense</span>
-            <span className="dash-sidebar__brand-tag">Operations Hub</span>
-          </div>
-        </Link>
-
-        <nav className="dash-sidebar__nav">
-          <div className="dash-sidebar__nav-section-title">Core Management</div>
-          {navLinks.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`dash-sidebar__link${isActive ? " dash-sidebar__link--active" : ""}`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-                {item.path === "/reorder-rules" && lowOrOutNum > 0 && (
-                  <span className="dash-sidebar__badge">{lowOrOutNum}</span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar User Footer */}
-        <div className="dash-sidebar__user">
-          <div className="dash-sidebar__avatar">AD</div>
-          <div className="dash-sidebar__user-info">
-            <div className="dash-sidebar__user-name">Admin Staff</div>
-            <div className="dash-sidebar__user-role">Inventory Lead</div>
-          </div>
-          <Link
-            to="/login"
-            className="dash-sidebar__logout-btn"
-            title="Sign out of StockSense"
-            aria-label="Sign out"
-          >
-            <LogoutIcon />
-          </Link>
-        </div>
-      </aside>
-
-      {/* ============================================================ */}
-      {/* MAIN CONTENT AREA                                            */}
-      {/* ============================================================ */}
-      <div className="dash-main">
-        {/* TOP BAR */}
-        <header className="dash-topbar">
-          <div className="dash-topbar__left">
-            <button
-              type="button"
-              className="dash-topbar__menu-toggle"
-              onClick={() => setSidebarOpen((prev) => !prev)}
-              aria-label="Toggle navigation menu"
-            >
-              <MenuIcon />
-            </button>
-            <div className="dash-topbar__context">
-              <span className="dash-topbar__breadcrumb">StockSense / Logistics</span>
-              <span className="dash-topbar__title">Operations Dashboard</span>
-            </div>
-          </div>
-
-          {/* Quick Search */}
-          <div className="dash-topbar__search">
+    <div className="dashboard-content-root">
+      {/* Quick Action & Controls Toolbar */}
+      <div className="dash-toolbar-card">
+        <div className="dash-toolbar-left">
+          <div className="dash-toolbar-search">
             <span className="dash-topbar__search-icon">
               <SearchIcon />
             </span>
             <input
               type="text"
               className="dash-topbar__search-input"
-              placeholder="Search reference, SKU, or warehouse..."
+              placeholder="Search operations reference, SKU, or facility..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Quick search operations"
+              aria-label="Filter operations"
             />
-            <span className="dash-topbar__search-kbd">⌘K</span>
           </div>
+        </div>
 
-          <div className="dash-topbar__right">
-            {/* Live System Indicator */}
-            <div className="dash-topbar__status-pill">
-              <span className="dash-topbar__status-pulse" />
-              <span>4 Warehouses Live</span>
-            </div>
+        <div className="dash-toolbar-actions">
+          <button
+            type="button"
+            className="dash-toolbar-btn"
+            onClick={handleRefresh}
+            title="Refresh telemetry data"
+          >
+            <span style={{ display: "flex", animation: refreshing ? "dash-fade-in 0.6s infinite" : "none" }}>
+              <RefreshIcon />
+            </span>
+            <span>Refresh</span>
+          </button>
 
-            {/* Refresh Action */}
-            <button
-              type="button"
-              className="dash-topbar__icon-btn"
-              onClick={handleRefresh}
-              title="Refresh telemetry data"
-              aria-label="Refresh telemetry data"
-            >
-              <span style={{ display: "flex", animation: refreshing ? "dash-fade-in 0.6s infinite" : "none" }}>
-                <RefreshIcon />
-              </span>
-            </button>
+          <button
+            type="button"
+            className="dash-toolbar-btn"
+            onClick={() => setActiveModal("lowStock")}
+            title="View stock alerts"
+          >
+            <BellIcon />
+            <span>Alerts</span>
+            {lowOrOutNum > 0 && <span className="dash-topbar__badge-dot" style={{ position: "static", display: "inline-block" }} />}
+          </button>
 
-            {/* Alerts Bell Button */}
-            <button
-              type="button"
-              className="dash-topbar__icon-btn"
-              onClick={() => setActiveModal("lowStock")}
-              title="View active stock alerts"
-              aria-label="View active stock alerts"
-            >
-              <BellIcon />
-              {lowOrOutNum > 0 && <span className="dash-topbar__badge-dot" />}
-            </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => openCreateModal("receipt")}
+          >
+            <PlusIcon />
+            <span>+ Receipt</span>
+          </button>
 
-            {/* Primary Action Button */}
-            <button
-              type="button"
-              className="dash-btn-primary"
-              onClick={() => openCreateModal("receipt")}
-            >
-              <PlusIcon />
-              <span>New Operation</span>
-            </button>
-          </div>
-        </header>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setIsDeliveryModalOpen(true)}
+          >
+            <PlusIcon />
+            <span>+ Delivery</span>
+          </button>
 
-        {/* ============================================================ */}
-        {/* DASHBOARD BODY                                               */}
-        {/* ============================================================ */}
-        <main className="dash-body">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => openCreateModal("transfer")}
+          >
+            <PlusIcon />
+            <span>+ Transfer</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* DASHBOARD BODY                                               */}
+      {/* ============================================================ */}
+      <div className="dash-body">
           {/* Welcome Banner */}
           <section className="dash-welcome" aria-labelledby="dash-welcome-heading">
             <div className="dash-welcome__left">
@@ -1400,8 +1325,7 @@ function DashboardComponent() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
 
       {/* ============================================================ */}
       {/* MODAL: CARD DETAILS DRILLDOWN                                */}
