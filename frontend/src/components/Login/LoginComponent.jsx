@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
 function LoginComponent() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,19 +30,24 @@ function LoginComponent() {
         throw new Error(data.message || "Login failed");
       }
 
-      setSuccess("Login successful!");
+      setSuccess("Login successful! Redirecting to dashboard...");
       if (data.token) {
         localStorage.setItem("token", data.token);
       }
       if (data.user) {
         localStorage.setItem("user", JSON.stringify(data.user));
       }
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="login-page">

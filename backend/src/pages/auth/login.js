@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import prisma from "../../config/database.js";
+import { pool } from "../../config/database.js";
 
 const login = async (req, res) => {
   try {
@@ -14,12 +14,14 @@ const login = async (req, res) => {
       });
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: {
-        email: email.toLowerCase().trim(),
-      },
-    });
+    // Find user using pg query
+    const result = await pool.query(
+      "SELECT * FROM users WHERE LOWER(email) = $1",
+      [email.toLowerCase().trim()]
+    );
+
+    const user = result.rows[0];
+
 
     if (!user) {
       return res.status(401).json({
