@@ -1,6 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import "./Navbar.css";
 
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path d="M16 4.5 26.5 10.5 16 16.5 5.5 10.5Z" fill="#fff" />
+      <path d="M5.5 10.5 16 16.5v11L5.5 21.5Z" fill="#fff" fillOpacity=".72" />
+      <path d="M26.5 10.5 16 16.5v11l10.5-6Z" fill="#fff" fillOpacity=".45" />
+    </svg>
+  );
+}
+
 function Navbar() {
   const location = useLocation();
   const path = location.pathname;
@@ -19,35 +29,54 @@ function Navbar() {
   ];
 
   return (
-    <nav className="stocksense-navbar">
+    <header className="stocksense-navbar">
       <div className="navbar-container">
+        {/* Brand */}
         <Link to="/dashboard" className="navbar-brand">
-          <span className="brand-logo">📦</span>
-          <span className="brand-text">StockSense</span>
+          <span className="navbar-brand-mark">
+            <BrandMark />
+          </span>
+          <div className="navbar-brand-text">
+            <span className="navbar-brand-name">StockSense</span>
+            <span className="navbar-brand-tag">Operations</span>
+          </div>
         </Link>
 
-        <div className="navbar-links">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`nav-link ${path === item.path ? "active" : ""}`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
+        {/* Navigation Tabs */}
+        <nav className="navbar-links" aria-label="Main Navigation">
+          {navItems.map((item) => {
+            const isActive = path === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-link ${isActive ? "active" : ""}`}
+              >
+                <span>{item.label}</span>
+                {isActive && <span className="nav-indicator" />}
+              </Link>
+            );
+          })}
+        </nav>
 
+        {/* User Status & Profile */}
         <div className="navbar-user">
+          <div className="navbar-live-status" title="Warehouse telemetry active">
+            <span className="navbar-live-dot" />
+            <span>Live Sync</span>
+          </div>
+
           <Link to="/profile" className="user-badge" title="User Profile">
-            <span>👤 Admin Staff</span>
+            <span className="user-avatar-initials">AD</span>
+            <span className="user-name-text">Admin Staff</span>
           </Link>
-          <Link to="/login" className="logout-btn" title="Logout">
-            Logout
+
+          <Link to="/login" className="logout-btn" title="Sign out of StockSense">
+            Sign out
           </Link>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
 
